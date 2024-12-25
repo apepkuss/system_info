@@ -1,6 +1,5 @@
 use regex::Regex;
 use serde::Serialize;
-use serde_json::json;
 use sysctl::Sysctl;
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,7 +39,7 @@ pub struct SystemInfo {
 }
 
 /// Get system information, including CPU, GPU, RAM, and OS information.
-pub fn get_system_info() -> serde_json::Value {
+pub fn get_system_info() -> SystemInfo {
     // CPU Information
     let cpu_info = get_cpu_info();
 
@@ -48,7 +47,7 @@ pub fn get_system_info() -> serde_json::Value {
     let gpu_info = if cfg!(target_os = "macos") {
         get_macos_gpu_info()
     } else if cfg!(target_os = "linux") {
-        get_linux_gpu_info()
+        get_linux_gpu_info().unwrap()
     } else {
         vec![GPUInfo {
             manufacturer: "Unknown".to_string(),
@@ -65,14 +64,12 @@ pub fn get_system_info() -> serde_json::Value {
     let os_info = get_os_info();
 
     // Combine all information
-    let system_info = SystemInfo {
+    SystemInfo {
         cpu: cpu_info,
         gpu: gpu_info,
         ram: ram_info,
         os: os_info,
-    };
-
-    json!(system_info)
+    }
 }
 
 /// Get CPU information.
@@ -107,7 +104,7 @@ pub fn get_cpu_info() -> CPUInfo {
 #[test]
 fn test_get_cpu_info() {
     let info = get_cpu_info();
-    println!("{}", json!(info));
+    println!("{}", serde_json::json!(info));
 }
 
 /// Get RAM information.
@@ -148,7 +145,7 @@ pub fn get_ram_info() -> RAMInfo {
 #[test]
 pub fn test_get_ram_info() {
     let info = get_ram_info();
-    println!("{}", json!(info));
+    println!("{}", serde_json::json!(info));
 }
 
 /// Get OS information.
@@ -198,7 +195,7 @@ pub fn get_os_info() -> OSInfo {
 #[test]
 fn test_get_os_info() {
     let info = get_os_info();
-    println!("{}", json!(info));
+    println!("{}", serde_json::json!(info));
 }
 
 /// Get GPU information for macOS.
@@ -238,107 +235,69 @@ pub fn get_macos_gpu_info() -> Vec<GPUInfo> {
 #[test]
 fn test_get_macos_gpu_info() {
     let info = get_macos_gpu_info();
-    println!("{}", json!(info));
+    println!("{}", serde_json::json!(info));
 }
 
 /// Get GPU information for Linux.
-pub fn get_linux_gpu_info() -> Vec<GPUInfo> {
+fn get_linux_gpu_info() -> Result<Vec<GPUInfo>, Box<dyn std::error::Error>> {
+    // 执行 lshw 命令
+    let output = std::process::Command::new("lshw")
+        .arg("-C")
+        .arg("display") // 只获取显示设备信息
+        .output()?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to execute lshw: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+
+    // 将输出转换为字符串
+    let stdout = String::from_utf8(output.stdout)?;
+
+    // 解析 vendor 和 product 信息
     let mut gpus = Vec::new();
+    let mut current_vendor = None;
+    let mut current_product = None;
 
-    // Try to use `lspci` to get GPU info
-    let output = std::process::Command::new("lspci")
-        .arg("-vnn")
-        .output()
-        .unwrap_or_else(|_| panic!("Failed to execute `lspci`. Is it installed?"));
+    for line in stdout.lines() {
+        // 去掉多余的空格
+        let line = line.trim();
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let lines = stdout.lines();
+        // 匹配 vendor 信息
+        if line.starts_with("vendor:") {
+            current_vendor = Some(line.trim_start_matches("vendor:").trim().to_string());
+        }
 
-    let mut current_gpu = None;
-    for line in lines {
-        if line.contains("VGA compatible controller") || line.contains("3D controller") {
-            // Extract GPU Model
-            if let Some(index) = line.find(":") {
-                let model = line[index + 1..].trim().to_string();
-                current_gpu = Some(GPUInfo {
-                    manufacturer: "Unknown".to_string(),
-                    model,
-                    memory: 0,
-                    cores: None,
-                });
-            }
-        } else if let Some(ref mut gpu) = current_gpu {
-            // Extract Memory Info
-            if line.contains("Memory at") && line.contains("[size=") {
-                let memory_regex = Regex::new(r"\[size=(\d+)([KMGT])B\]").unwrap();
-                if let Some(caps) = memory_regex.captures(line) {
-                    let size: u32 = caps[1].parse().unwrap_or(0);
-                    let unit = &caps[2];
-                    let memory_mb = match unit {
-                        "K" => size / 1024,
-                        "M" => size,
-                        "G" => size * 1024,
-                        _ => 0,
-                    };
-                    gpu.memory = memory_mb;
-                }
-            }
-            if line.contains("NVIDIA") {
-                // Attempt to get core count for NVIDIA GPUs
-                if let Ok(output) = std::process::Command::new("nvidia-smi")
-                    .arg("--query-gpu=clocks.cores")
-                    .arg("--format=csv,noheader")
-                    .output()
-                {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    if let Ok(core_count) = stdout.trim().parse::<u32>() {
-                        gpu.cores = Some(core_count);
-                    }
-                }
-            }
-            if !line.contains("Memory") {
-                gpus.push(gpu.clone());
-                current_gpu = None;
-            }
+        // 匹配 product 信息
+        if line.starts_with("product:") {
+            current_product = Some(line.trim_start_matches("product:").trim().to_string());
+        }
+
+        // 如果找到 vendor 和 product，将其加入结果
+        if let (Some(vendor), Some(product)) = (&current_vendor, &current_product) {
+            let gpu = GPUInfo {
+                manufacturer: vendor.clone(),
+                model: product.clone(),
+                memory: 0,
+                cores: None,
+            };
+            gpus.push(gpu);
+
+            // reset current_vendor and current_product for next gpu
+            current_vendor = None;
+            current_product = None;
         }
     }
 
-    // if gpus.is_empty() {
-    //     // Fallback to `nvidia-smi` if `lspci` fails
-    //     if let Ok(output) = std::process::Command::new("nvidia-smi")
-    //         .arg("--query-gpu=name,memory.total,clocks.cores")
-    //         .arg("--format=csv,noheader")
-    //         .output()
-    //     {
-    //         let stdout = String::from_utf8_lossy(&output.stdout);
-    //         for line in stdout.lines() {
-    //             let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
-    //             if parts.len() >= 3 {
-    //                 let model = parts[0].to_string();
-    //                 let memory: u32 = parts[1]
-    //                     .split_whitespace()
-    //                     .next()
-    //                     .unwrap_or("0")
-    //                     .parse()
-    //                     .unwrap_or(0);
-    //                 let cores: u32 = parts[2].parse().unwrap_or(0);
-    //                 gpus.push(GPUInfo {
-    //                     manufacturer: "NVIDIA".to_string(),
-    //                     model,
-    //                     memory,
-    //                     cores: Some(cores),
-    //                 });
-    //             }
-    //         }
-    //     }
-    // }
-
-    gpus
+    Ok(gpus)
 }
 
 #[cfg(target_os = "linux")]
 #[test]
 fn test_get_linux_gpu_info() {
-    let info = get_linux_gpu_info();
-    println!("{}", json!(info));
+    let info = get_linux_gpu_info().unwrap();
+    println!("{}", serde_json::json!(info));
 }
