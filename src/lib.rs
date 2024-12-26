@@ -240,64 +240,7 @@ fn test_get_macos_gpu_info() {
     println!("{}", serde_json::json!(info));
 }
 
-/// Get GPU information for Linux.
-fn get_linux_gpu_info_old() -> Result<Vec<GPUInfo>, Box<dyn std::error::Error>> {
-    // 执行 lshw 命令
-    let output = std::process::Command::new("lshw")
-        .arg("-C")
-        .arg("display") // 只获取显示设备信息
-        .output()?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "Failed to execute lshw: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )
-        .into());
-    }
-
-    // 将输出转换为字符串
-    let stdout = String::from_utf8(output.stdout)?;
-
-    // 解析 vendor 和 product 信息
-    let mut gpus = Vec::new();
-    let mut current_vendor = None;
-    let mut current_product = None;
-
-    for line in stdout.lines() {
-        // 去掉多余的空格
-        let line = line.trim();
-
-        // 匹配 vendor 信息
-        if line.starts_with("vendor:") {
-            current_vendor = Some(line.trim_start_matches("vendor:").trim().to_string());
-        }
-
-        // 匹配 product 信息
-        if line.starts_with("product:") {
-            current_product = Some(line.trim_start_matches("product:").trim().to_string());
-        }
-
-        // 如果找到 vendor 和 product，将其加入结果
-        if let (Some(vendor), Some(product)) = (&current_vendor, &current_product) {
-            let gpu = GPUInfo {
-                manufacturer: vendor.clone(),
-                model: product.clone(),
-                memory: None,
-                cores: None,
-            };
-            gpus.push(gpu);
-
-            // reset current_vendor and current_product for next gpu
-            current_vendor = None;
-            current_product = None;
-        }
-    }
-
-    Ok(gpus)
-}
-
-/// 检测是否安装了 nvidia-smi
+/// Check if nvidia-smi is installed
 fn is_nvidia_smi_installed() -> bool {
     Command::new("nvidia-smi")
         .arg("--version")
@@ -305,11 +248,11 @@ fn is_nvidia_smi_installed() -> bool {
         .map_or(false, |output| output.status.success())
 }
 
-/// 通过 nvidia-smi 获取 GPU 信息
+/// Get GPU information via nvidia-smi
 fn get_gpu_info_from_nvidia_smi() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     let output = Command::new("nvidia-smi")
-        .arg("--query-gpu=name,memory.total") // 查询 GPU 名称、显存和核心数
-        .arg("--format=csv,noheader,nounits") // 格式化输出为 CSV
+        .arg("--query-gpu=name,memory.total") // Query GPU name, memory and core count
+        .arg("--format=csv,noheader,nounits") // Format output as CSV
         .output()?;
 
     if !output.status.success() {
@@ -339,7 +282,7 @@ fn get_gpu_info_from_nvidia_smi() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     Ok(gpus)
 }
 
-/// 通过 lshw 获取 GPU 信息
+/// Get GPU information via lshw
 fn get_gpu_info_from_lshw() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     let output = Command::new("lshw").arg("-C").arg("display").output()?;
 
@@ -371,8 +314,8 @@ fn get_gpu_info_from_lshw() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
             let gpu = GPUInfo {
                 manufacturer: vendor.clone(),
                 model: product.clone(),
-                memory: None, // lshw 无法提供显存大小
-                cores: None,  // lshw 无法提供核心数
+                memory: None, // lshw cannot provide memory size
+                cores: None,  // lshw cannot provide core count
             };
             gpus.push(gpu);
             current_vendor = None;
@@ -383,7 +326,7 @@ fn get_gpu_info_from_lshw() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     Ok(gpus)
 }
 
-/// 综合获取 GPU 信息
+/// Comprehensive GPU information retrieval
 fn get_linux_gpu_info() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     if is_nvidia_smi_installed() {
         println!("Using nvidia-smi to retrieve GPU information.");
