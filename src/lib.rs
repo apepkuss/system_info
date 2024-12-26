@@ -269,10 +269,16 @@ fn get_gpu_info_from_nvidia_smi() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     for line in stdout.lines() {
         let fields: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
         if fields.len() == 2 {
+            // vram in GB
+            let memory = match fields[1].parse::<f32>() {
+                Ok(memory) => Some(memory / 1024.0),
+                Err(_) => None,
+            };
+
             let gpu = GPUInfo {
                 manufacturer: "NVIDIA".to_string(),
                 model: fields[0].to_string(),
-                memory: fields[1].parse().ok(),
+                memory: memory.map(|m| m as u32),
                 cores: None,
             };
             gpus.push(gpu);
