@@ -332,8 +332,8 @@ fn get_gpu_info_from_lshw() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     Ok(gpus)
 }
 
-/// Comprehensive GPU information retrieval
-fn get_linux_gpu_info() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
+/// Get GPU information for Linux.
+pub fn get_linux_gpu_info() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     if is_nvidia_smi_installed() {
         println!("Using nvidia-smi to retrieve GPU information.");
         get_gpu_info_from_nvidia_smi()
