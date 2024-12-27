@@ -3,41 +3,61 @@ use serde::Serialize;
 use std::{error::Error, process::Command};
 use sysctl::Sysctl;
 
+/// CPU information.
 #[derive(Debug, Clone, Serialize)]
 pub struct CPUInfo {
-    manufacturer: String,
-    model: String,
-    cores: usize,
+    /// CPU manufacturer.
+    pub manufacturer: String,
+    /// CPU model.
+    pub model: String,
+    /// Number of CPU cores.
+    pub cores: usize,
 }
 
+/// GPU information.
 #[derive(Debug, Clone, Serialize)]
 pub struct GPUInfo {
-    manufacturer: String,
-    model: String,
+    /// GPU manufacturer.
+    pub manufacturer: String,
+    /// GPU model.
+    pub model: String,
+    /// Memory in MB.
     #[serde(skip_serializing_if = "Option::is_none")]
-    memory: Option<u32>, // Memory in MB
+    pub memory: Option<u32>,
+    /// GPU cores (if available).
     #[serde(skip_serializing_if = "Option::is_none")]
-    cores: Option<u32>, // GPU cores (if available)
+    pub cores: Option<u32>, // GPU cores (if available)
 }
 
+/// RAM information.
 #[derive(Debug, Clone, Serialize)]
 pub struct RAMInfo {
-    total: u64, // Total RAM in GB
+    /// Total RAM in GB.
+    pub total: u64,
 }
 
+/// OS information.
 #[derive(Debug, Clone, Serialize)]
 pub struct OSInfo {
-    name: String,
-    version: String,
-    architecture: String,
+    /// OS name.
+    pub name: String,
+    /// OS version.
+    pub version: String,
+    /// OS architecture.
+    pub architecture: String,
 }
 
+/// System information.
 #[derive(Debug, Clone, Serialize)]
 pub struct SystemInfo {
-    cpu: CPUInfo,
-    gpu: Vec<GPUInfo>,
-    ram: RAMInfo,
-    os: OSInfo,
+    /// CPU information.
+    pub cpu: CPUInfo,
+    /// GPU information.
+    pub gpu: Vec<GPUInfo>,
+    /// RAM information.
+    pub ram: RAMInfo,
+    /// OS information.
+    pub os: OSInfo,
 }
 
 /// Get system information, including CPU, GPU, RAM, and OS information.
