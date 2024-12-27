@@ -1,6 +1,6 @@
-# Get System Information
+# System_info: A library for Getting System Information
 
-Get system information, including CPU, GPU, RAM, and OS information.
+In `system_info`, a group of APIs are defined to get some system information, including CPU, GPU, RAM, and OS information.
 
 ## Usage
 
