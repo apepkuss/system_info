@@ -1,3 +1,18 @@
+//! A library for getting system information, including CPU, GPU, RAM, and OS information.
+//!
+//! This library provides a set of APIs to retrieve system information, including CPU, GPU, RAM, and OS information.
+//! It supports both macOS and Linux systems.
+//!
+//! # Usage
+//!
+//! ```rust
+//! use system_info_lite::{get_system_info, get_cpu_info, get_ram_info, get_os_info};
+//! use serde_json::json;
+//!
+//! let info = get_system_info();
+//! println!("{}", json!(info));
+//! ```
+
 use regex::Regex;
 use serde::Serialize;
 use std::{error::Error, process::Command};
