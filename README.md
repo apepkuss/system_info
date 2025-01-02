@@ -20,7 +20,7 @@ let ram_info = get_ram_info();
 println!("{:#?}", ram_info);
 
 // Get GPU information.
-let gpu_info = get_gpu_info();
+let gpu_info = get_gpu_info().unwrap();
 println!("{:#?}", gpu_info);
 
 // Get OS information.
