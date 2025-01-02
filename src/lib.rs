@@ -68,7 +68,8 @@ pub struct SystemInfo {
     /// CPU information.
     pub cpu: CPUInfo,
     /// GPU information.
-    pub gpu: Vec<GPUInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu: Option<Vec<GPUInfo>>,
     /// RAM information.
     pub ram: RAMInfo,
     /// OS information.
@@ -76,7 +77,7 @@ pub struct SystemInfo {
 }
 
 /// Get system information, including CPU, GPU, RAM, and OS information.
-pub fn get_system_info() -> SystemInfo {
+pub fn get_system_info() -> Result<SystemInfo, Box<dyn Error>> {
     // CPU Information
     let cpu_info = get_cpu_info();
 
@@ -84,14 +85,14 @@ pub fn get_system_info() -> SystemInfo {
     let gpu_info = if cfg!(target_os = "macos") {
         get_macos_gpu_info()
     } else if cfg!(target_os = "linux") {
-        get_linux_gpu_info().unwrap()
+        get_linux_gpu_info()?
     } else {
-        vec![GPUInfo {
-            manufacturer: "Unknown".to_string(),
-            model: "Unknown".to_string(),
-            memory: None,
-            cores: None,
-        }]
+        vec![]
+    };
+    let gpu_info = if gpu_info.is_empty() {
+        None
+    } else {
+        Some(gpu_info)
     };
 
     // RAM Information
@@ -101,12 +102,12 @@ pub fn get_system_info() -> SystemInfo {
     let os_info = get_os_info();
 
     // Combine all information
-    SystemInfo {
+    Ok(SystemInfo {
         cpu: cpu_info,
         gpu: gpu_info,
         ram: ram_info,
         os: os_info,
-    }
+    })
 }
 
 /// Get CPU information.
@@ -285,42 +286,66 @@ fn is_nvidia_smi_installed() -> bool {
 
 /// Get GPU information via nvidia-smi
 fn get_gpu_info_from_nvidia_smi() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
-    let output = Command::new("nvidia-smi")
-        .arg("--query-gpu=name,memory.total") // Query GPU name, memory and core count
-        .arg("--format=csv,noheader,nounits") // Format output as CSV
-        .output()?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "Failed to execute nvidia-smi: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )
-        .into());
-    }
-
-    let stdout = String::from_utf8(output.stdout)?;
     let mut gpus = Vec::new();
 
-    for line in stdout.lines() {
-        let fields: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
-        if fields.len() == 2 {
-            // vram in GB
-            let memory = match fields[1].parse::<f32>() {
-                Ok(memory) => Some(memory / 1024.0),
-                Err(_) => None,
-            };
+    if wasmedge_on_gpu() {
+        let output = Command::new("nvidia-smi")
+            .arg("--query-gpu=name,memory.total") // Query GPU name, memory and core count
+            .arg("--format=csv,noheader,nounits") // Format output as CSV
+            .output()?;
 
-            let gpu = GPUInfo {
-                manufacturer: "NVIDIA".to_string(),
-                model: fields[0].to_string(),
-                memory: memory.map(|m| m as u32),
-                cores: None,
-            };
-            gpus.push(gpu);
+        if !output.status.success() {
+            return Err(format!(
+                "Failed to execute nvidia-smi: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+            .into());
+        }
+
+        let stdout = String::from_utf8(output.stdout)?;
+
+        for line in stdout.lines() {
+            let fields: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+            if fields.len() == 2 {
+                // vram in GB
+                let memory = match fields[1].parse::<f32>() {
+                    Ok(memory) => Some(memory / 1024.0),
+                    Err(_) => None,
+                };
+
+                let gpu = GPUInfo {
+                    manufacturer: "NVIDIA".to_string(),
+                    model: fields[0].to_string(),
+                    memory: memory.map(|m| m as u32),
+                    cores: None,
+                };
+                gpus.push(gpu);
+            }
         }
     }
 
     Ok(gpus)
+}
+
+fn wasmedge_on_gpu() -> bool {
+    // Execute nvidia-smi command
+    let output = Command::new("nvidia-smi")
+        .output()
+        .expect("Failed to execute nvidia-smi");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Filter lines related to wasmedge
+    let wasmedge_lines: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.contains("wasmedge"))
+        .collect();
+
+    if wasmedge_lines.is_empty() {
+        false
+    } else {
+        true
+    }
 }
 
 /// Get GPU information via lshw
@@ -370,10 +395,8 @@ fn get_gpu_info_from_lshw() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
 /// Get GPU information for Linux.
 pub fn get_linux_gpu_info() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
     if is_nvidia_smi_installed() {
-        println!("Using nvidia-smi to retrieve GPU information.");
         get_gpu_info_from_nvidia_smi()
     } else {
-        println!("nvidia-smi not found. Falling back to lshw.");
         get_gpu_info_from_lshw()
     }
 }
@@ -381,12 +404,18 @@ pub fn get_linux_gpu_info() -> Result<Vec<GPUInfo>, Box<dyn Error>> {
 #[cfg(target_os = "linux")]
 #[test]
 fn test_get_linux_gpu_info() {
-    let info = get_linux_gpu_info().unwrap();
-    println!("{}", serde_json::json!(info));
+    let result = get_linux_gpu_info();
+    match result {
+        Ok(info) => println!("{}", serde_json::json!(info)),
+        Err(e) => println!("Error: {}", e),
+    }
 }
 
 #[test]
 fn test_get_system_info() {
-    let info = get_system_info();
-    println!("{}", serde_json::json!(info));
+    let result = get_system_info();
+    match result {
+        Ok(info) => println!("{}", serde_json::json!(info)),
+        Err(e) => println!("Error: {}", e),
+    }
 }
