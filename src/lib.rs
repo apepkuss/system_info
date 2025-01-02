@@ -9,7 +9,7 @@
 //! use system_info_lite::{get_system_info, get_cpu_info, get_ram_info, get_os_info};
 //! use serde_json::json;
 //!
-//! let info = get_system_info();
+//! let info = get_system_info().unwrap();
 //! println!("{}", json!(info));
 //! ```
 
