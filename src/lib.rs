@@ -14,12 +14,12 @@
 //! ```
 
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{error::Error, process::Command};
 use sysctl::Sysctl;
 
 /// CPU information.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CPUInfo {
     /// CPU manufacturer.
     pub manufacturer: String,
@@ -30,7 +30,7 @@ pub struct CPUInfo {
 }
 
 /// GPU information.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GPUInfo {
     /// GPU manufacturer.
     pub manufacturer: String,
@@ -45,14 +45,14 @@ pub struct GPUInfo {
 }
 
 /// RAM information.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RAMInfo {
     /// Total RAM in GB.
     pub total: u64,
 }
 
 /// OS information.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OSInfo {
     /// OS name.
     pub name: String,
@@ -63,7 +63,7 @@ pub struct OSInfo {
 }
 
 /// System information.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemInfo {
     /// CPU information.
     pub cpu: CPUInfo,
