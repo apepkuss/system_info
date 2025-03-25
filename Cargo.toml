@@ -1,16 +1,16 @@
 [package]
-name = "system-info-lite"
-version = "0.1.1"
-edition = "2021"
-description = "A library for getting system information, including CPU, GPU, RAM, and OS information."
-license = "Apache-2.0"
-repository = "https://github.com/apepkuss/system_info"
-keywords = ["hardware", "OS", "CPU", "GPU", "RAM"]
-readme = "README.md"
+name          = "system-info-lite"
+version       = "0.1.2"
+edition       = "2021"
+description   = "A library for getting system information, including CPU, GPU, RAM, and OS information."
+license       = "Apache-2.0"
+repository    = "https://github.com/apepkuss/system_info"
+keywords      = ["hardware", "OS", "CPU", "GPU", "RAM"]
+readme        = "README.md"
 documentation = "https://docs.rs/system_info_lite/"
 
 [dependencies]
-sysctl = "0.6.0"
-serde = { version = "1.0", features = ["derive"] }
+sysctl     = "0.6.0"
+serde      = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-regex = "1.10.0"
+regex      = "1.10.0"
